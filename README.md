@@ -26,7 +26,7 @@ It works offline (network calls and auto-updates are disabled) and uses headless
 Place your `.drawio` files into the repository's `data/` folder and run the container by mounting it to `/data` (Linux):
 
 ```bash
-docker run --rm -v "$(pwd)/data:/data" drawio-exporter
+docker run --rm -v "$(pwd)/data:/data" ghcr.io/rootshell-coder/drawio-exporter:latest
 ```
 
 Notes:
@@ -39,13 +39,13 @@ Notes:
 If you're using Podman on Linux, the invocation is similar:
 
 ```bash
-podman run --rm -v "$(pwd)/data:/data" drawio-exporter
+podman run --rm -v "$(pwd)/data:/data" ghcr.io/rootshell-coder/drawio-exporter:latest
 ```
 
 On SELinux-enabled systems (e.g., Fedora/RHEL), add `:Z` to the volume to relabel the mount for the container context:
 
 ```bash
-podman run --rm -v "$(pwd)/data:/data:Z" drawio-exporter
+podman run --rm -v "$(pwd)/data:/data:Z" ghcr.io/rootshell-coder/drawio-exporter:latest
 ```
 
 ## Example
