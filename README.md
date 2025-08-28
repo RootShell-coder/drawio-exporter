@@ -48,7 +48,7 @@ On SELinux-enabled systems (e.g., Fedora/RHEL), add `:Z` to the volume to relabe
 podman run --rm -v "$(pwd)/data:/data:Z" ghcr.io/rootshell-coder/drawio-exporter:latest
 ```
 
-## gitlab-ci.yml
+## gitlab ci
 
 ```yaml
 stages:
