@@ -48,6 +48,43 @@ On SELinux-enabled systems (e.g., Fedora/RHEL), add `:Z` to the volume to relabe
 podman run --rm -v "$(pwd)/data:/data:Z" ghcr.io/rootshell-coder/drawio-exporter:latest
 ```
 
+## gitlab-ci.yml
+
+```yaml
+stages:
+  - export
+
+services:
+  - name: docker:dind
+    alias: docker
+
+variables:
+  DOCKER_HOST: tcp://docker:2376
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: "/certs"
+
+export:all:
+  stage: export
+  tags:
+    - runner
+  image:
+    name: ghcr.io/rootshell-coder/drawio-exporter:latest
+    entrypoint: [""]
+  rules:
+    - exists:
+        - "*.drawio"
+        - "*.drawio.xml"
+  script:
+    - cd "$CI_PROJECT_DIR"
+    - /usr/local/bin/entrypoint
+  artifacts:
+    when: always
+    expire_in: 1 day
+    paths:
+      - "*.svg"
+      - "*.png"
+```
+
 ## Example
 
 Source: `data/test diagram.drawio`
