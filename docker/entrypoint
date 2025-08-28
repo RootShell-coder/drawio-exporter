@@ -1,0 +1,92 @@
+#!/bin/bash
+set -euo pipefail
+
+export DBUS_SESSION_BUS_ADDRESS=/dev/null
+
+# Отключить проверки обновлений и сетевые запросы
+export ELECTRON_DISABLE_UPDATER=1
+export ELECTRON_NO_ATTACH_CONSOLE=1
+export DISABLE_BACKGROUND_NETWORKING=1
+
+found_any=false
+while IFS= read -r -d '' f; do
+  found_any=true
+  echo "Processing $f..."
+
+  inpath=$(readlink -f "$f" 2>/dev/null || realpath "$f" 2>/dev/null || echo "")
+  if [ -z "$inpath" ] || [ ! -f "$inpath" ]; then
+    echo "  Skip: input not found -> $f"
+    continue
+  fi
+
+  outdir=$(dirname "$inpath")
+  filename=$(basename "$inpath")
+  base="${filename%.*}"
+
+  # Надёжный подсчёт страниц
+  pages=$(grep -c "<diagram" "$inpath" | tr -d ' ' || echo 1)
+  if [ -z "$pages" ] || [ "$pages" -le 0 ] 2>/dev/null; then
+      pages=1
+  fi
+  echo "  Found $pages page(s)."
+
+  # Экспорт каждой страницы - разные подходы к индексации
+  for (( i=0; i<pages; i++ )); do
+      page_display=$((i + 1))
+      svg_file="$outdir/$base-page$page_display.svg"
+      png_file="$outdir/$base-page$page_display.png"
+
+      # Этап 1: Экспорт страницы в SVG
+      echo "  -> Exporting page $page_display (drawio index $i) to SVG: $svg_file"
+
+      # Разные подходы к индексации
+      if [ $pages -eq 1 ]; then
+          # Для одностраничных документов не используется page-index
+          xvfb-run -a -s "-screen 0 4096x4096x24" \
+            drawio "$inpath" \
+            --no-sandbox --disable-gpu --disable-updater \
+            --disable-dev-shm-usage --disable-background-networking \
+            --export --format svg --overwrite \
+            --output "$svg_file" >/dev/null 2>&1
+      else
+          # Для многостраничных try 1-based индексацию
+          page_index_1based=$((i + 1))
+          xvfb-run -a -s "-screen 0 4096x4096x24" \
+            drawio "$inpath" \
+            --no-sandbox --disable-gpu --disable-updater \
+            --disable-dev-shm-usage --disable-background-networking \
+            --export --format svg --overwrite \
+            --page-index $page_index_1based \
+            --output "$svg_file" >/dev/null 2>&1
+      fi
+
+      if [ ! -f "$svg_file" ]; then
+        echo "  !! Failed to export page $page_display to SVG."
+        continue
+      fi
+
+      # Проверка размера файла для отладки
+      svg_size=$(stat -f%z "$svg_file" 2>/dev/null || stat -c%s "$svg_file" 2>/dev/null || echo "unknown")
+      echo "  >> SVG file created: size=$svg_size bytes"
+
+      # Проверка, не одинаковый ли размер у всех файлов (признак дублирования)
+      if [ $i -gt 0 ] && [ -f "$outdir/$base-page1.svg" ]; then
+          first_size=$(stat -f%z "$outdir/$base-page1.svg" 2>/dev/null || stat -c%s "$outdir/$base-page1.svg" 2>/dev/null || echo "0")
+          if [ "$svg_size" = "$first_size" ]; then
+              echo "  !! WARNING: Same file size as page 1 - possible duplicate content!"
+          fi
+      fi
+
+      # Этап 2: Конвертация SVG в PNG
+      echo "  -> Converting SVG to $png_file..."
+      rsvg-convert -o "$png_file" -d 150 -p 150 "$svg_file" 2>/dev/null
+
+      echo "     Created $png_file"
+      echo "     SVG file saved: $svg_file"
+  done
+
+done < <(find . -maxdepth 1 -type f \( -name '*.drawio' -o -name '*.drawio.xml' \) -print0)
+
+if [ "$found_any" = false ]; then
+  echo "No .drawio or .drawio.xml files found in $(pwd)."
+fi
